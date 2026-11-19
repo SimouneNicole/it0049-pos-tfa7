@@ -1,16 +1,16 @@
-# POS Eloquent (Laravel)
+# POS Eloquent — Forms, Validation & File Uploads (Laravel)
 
-A clean, minimalist Point of Sale (POS) foundation rebuilt in Laravel for **IT0049 (Web System Technologies) - Technical Formative Assessment 6 (TFA6)**. This project upgrades the POS system from static in-memory arrays to **Laravel Eloquent ORM**, backed by relational schema migrations, model seeders, and dual-database support (SQLite / MySQL), while preserving the custom **Liquid Glass** design system.
+A clean, minimalist Point of Sale (POS) application built in Laravel 13 for **IT0049 (Web System Technologies) - Technical Formative Assessment 7 (TFA7)**. Extending TFA6's **Liquid Glass** design system and Eloquent ORM models, this release adds validated create and edit workflows for customers and staff users (`old()` input retention + `$errors` feedback) and display-ready user avatar uploads processed with **Intervention Image (`intervention/image-laravel`)** on `Storage::disk('public')`.
 
 - **Student:** Simoune Nicole
-- **GitHub Repository**: [SimouneNicole/it0049-pos-tfa6](https://github.com/SimouneNicole/it0049-pos-tfa6)
-- **Live Deployment**: [http://it0049-tfa6.infinityfreeapp.com/](http://it0049-tfa6.infinityfreeapp.com/)
+- **GitHub Repository:** [SimouneNicole/it0049-pos-tfa7](https://github.com/SimouneNicole/it0049-pos-tfa7)
+- **Live Deployment:** [http://it0049-tfa7.freehosting.dev](http://it0049-tfa7.freehosting.dev)
 
 ---
 
 ## System Requirements
 
-- **PHP**: 8.2 or higher (configured with `pdo_sqlite`, `pdo_mysql`, `mbstring`, `openssl`, `tokenizer`, `xml`, `ctype`, `json`)
+- **PHP**: 8.3 or higher (with `pdo_sqlite`, `pdo_mysql`, `mbstring`, `openssl`, `gd`, `zip`)
 - **Composer**: 2.0 or higher
 - **Web Server**: Apache / Nginx / PHP built-in server
 
@@ -20,8 +20,8 @@ A clean, minimalist Point of Sale (POS) foundation rebuilt in Laravel for **IT00
 
 1. **Clone the repository**:
    ```bash
-   git clone https://github.com/SimouneNicole/it0049-pos-tfa6.git
-   cd it0049-pos-tfa6
+   git clone https://github.com/SimouneNicole/it0049-pos-tfa7.git
+   cd it0049-pos-tfa7
    ```
 
 2. **Install Composer dependencies**:
@@ -30,16 +30,16 @@ A clean, minimalist Point of Sale (POS) foundation rebuilt in Laravel for **IT00
    ```
 
 3. **Configure Environment**:
-   Copy `.env.example` to `.env` and generate an application encryption key:
    ```bash
    cp .env.example .env
    php artisan key:generate
    ```
 
-4. **Prepare Database & Seeds**:
+4. **Prepare Database, Seeds & Public Storage Link**:
    ```bash
    touch database/database.sqlite
    php artisan migrate:fresh --seed
+   php artisan storage:link
    ```
 
 5. **Start the Development Server**:
@@ -52,79 +52,61 @@ A clean, minimalist Point of Sale (POS) foundation rebuilt in Laravel for **IT00
 
 ## Application Routes
 
-| Method | Route | Controller Action | Model Query | Description |
+| Method | Route | Route Name | Controller Action | Purpose |
 |---|---|---|---|---|
-| `GET` | `/` | `\App\Http\Controllers\PageController@home` | N/A | Overview landing page with mineral glass lens hero |
-| `GET` | `/about` | `\App\Http\Controllers\PageController@about` | System Architecture | System architecture and platform description |
-| `GET` | `/customers` | `\App\Http\Controllers\CustomerController@index` | `App\Models\Customer::all()` | Customer accounts listing retrieved via Eloquent (6 records) |
-| `GET` | `/users` | `\App\Http\Controllers\UserController@index` | `App\Models\User::all()` | Staff user accounts directory with roles via Eloquent (6 records) |
+| `GET` | `/` | `home` | `PageController@home` | Landing overview with mineral glass lens & quick links |
+| `GET` | `/about` | `about` | `PageController@about` | System architecture & TFA7 capabilities overview |
+| `GET` | `/customers` | `customers.index` | `CustomerController@index` | Customer accounts table with `+ New Customer` & `Edit` |
+| `GET` | `/customers/create` | `customers.create` | `CustomerController@create` | Create customer form |
+| `POST` | `/customers` | `customers.store` | `CustomerController@store` | Validate (`SaveCustomerRequest`) & insert customer |
+| `GET` | `/customers/{customer}/edit` | `customers.edit` | `CustomerController@edit` | Edit customer form pre-filled with current data |
+| `PUT` | `/customers/{customer}` | `customers.update` | `CustomerController@update` | Validate (`Rule::unique()->ignore()`) & update customer |
+| `GET` | `/users` | `users.index` | `UserController@index` | Staff user accounts table displaying 40&times;40 avatars or placeholder |
+| `GET` | `/users/create` | `users.create` | `UserController@create` | Create user form with optional avatar upload |
+| `POST` | `/users` | `users.store` | `UserController@store` | Validate (`SaveUserRequest`), prepare avatar, & insert user |
+| `GET` | `/users/{user}/edit` | `users.edit` | `UserController@edit` | Edit user form pre-filled with details & avatar preview |
+| `PUT` | `/users/{user}` | `users.update` | `UserController@update` | Validate, crop/store avatar on `Storage::disk('public')`, & clean up old file |
 
 ---
 
-## Design System
+## Validation & Avatar Storage Architecture
 
-The interface uses the **Liquid Glass** aesthetic:
-- **Floating Navigation Capsule**: Semi-translucent pill navigation bar (`.nav-capsule`) with backdrop blur and active-route highlighting.
-- **Glass Mineral Lens**: Multi-layered circular specular highlight and ambient glow on the landing overview.
-- **Translucent Data Containers**: Responsive glass card containers (`.glass-table-container`) housing tabular customer and staff directories.
-- **Palette**: Mineral canvas (`#EFF4F7`), ink typography (`#17212B`), muted labels (`#5F6C78`), and subtle forest accent (`#3D7068`).
+1. **Form Requests (`app/Http/Requests/`)**:
+   - `SaveCustomerRequest`: trims inputs; requires `full_name` (`max:100`), requires valid unique `email` (`Rule::unique('customers', 'email')->ignore($customer?->id)`), and accepts optional `phone` (`max:20`).
+   - `SaveUserRequest`: trims inputs and defaults blank roles to `'Staff Member'`; requires unique `username` (`regex:/^[a-zA-Z0-9._-]+$/`, `Rule::unique('users', 'username')->ignore($user?->id)`), requires `full_name` (`max:100`), validates `role` against `User::ROLES`, and validates `avatar` (`nullable|file|image|max:2048` — 2 MB max).
+   - Validation failures automatically redirect back with `old()` input and `$errors` displayed in `#form-error-summary` (`role="alert"`) and field-level error messages.
 
----
-
-## Database Architecture & Eloquent Models
-
-### 1. Migrations (`database/migrations/`)
-- `customers` table (`0001_01_01_000003_create_customers_table.php`):
-  - `id`: BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY
-  - `full_name`: VARCHAR(100) NOT NULL
-  - `email`: VARCHAR(100) NOT NULL UNIQUE
-  - `phone`: VARCHAR(20) DEFAULT NULL
-  - `created_at`, `updated_at`: TIMESTAMPS
-- `users` table (`0001_01_01_000000_create_users_table.php`):
-  - `id`: BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY
-  - `username`: VARCHAR(50) NOT NULL UNIQUE
-  - `full_name`: VARCHAR(100) NOT NULL
-  - `role`: VARCHAR(50) NOT NULL DEFAULT 'Staff Member'
-  - `created_at`, `updated_at`: TIMESTAMPS
-
-### 2. Eloquent Models (`app/Models/`)
-- `Customer.php`: Represents the `customers` table with `$fillable = ['full_name', 'email', 'phone']`.
-- `User.php`: Represents the `users` table with `$fillable = ['username', 'full_name', 'role']`.
-
-### 3. Seeders & SQL Export
-- `CustomerSeeder.php`: Populates 6 canonical customer records (Eleanor Vance, Marcus Thorne, Sophia Sterling, Lucas Gallagher, Clara Delgado, Julian Hayes).
-- `UserSeeder.php`: Populates 6 canonical staff user accounts (Clara Delgado, Marcus Thorne, Eleanor Vance, Lucas Gallagher, Sophia Sterling, Julian Hayes).
-- `DatabaseSeeder.php`: Runs both seeders automatically.
-- `schema_export.sql`: Standalone MySQL DDL and DML export in `database/`.
+2. **Display-Ready Avatar Storage (`app/Services/AvatarService.php` & Migration `0001_01_01_000004_add_avatar_to_users_table.php`)**:
+   - Migration adds a nullable `avatar` (`varchar(255)`) column to `users`.
+   - `AvatarService::prepareAndStore()` decodes uploads with `Intervention\Image\Laravel\Facades\Image`, crops/resizes to **256&times;256**, encodes cleanly (`PNG`, `WEBP`, or `JPEG`), stores under `avatars/<uuid>.<ext>` on `Storage::disk('public')`, and saves **only the relative path** in `users.avatar`.
+   - Users without a custom avatar gracefully fall back to `public/images/avatar-placeholder.svg`; replaced or removed avatars are deleted after database persistence succeeds.
 
 ---
 
-## Automated Testing
+## Database Export & Automated Testing
 
-Run the feature test suite using PHPUnit:
-```bash
-php artisan test
-```
-
-Verification covers:
-- Landing page HTTP 200 and visual landmark elements (`.nav-capsule`, `.glass-lens`)
-- About page HTTP 200 and architectural statements
-- Customer directory HTTP 200 and Eloquent records rendering
-- User directory HTTP 200 and staff records rendering
-- Database seeder assertions verifying $\ge 5$ records per table
-- Eloquent model CRUD and Carbon datetime casting validation
-- Undefined routes returning standard HTTP 404 responses
+- **Migrations & Seeders**: `database/migrations/` & `database/seeders/` (6 canonical records per table)
+- **Standalone MySQL Export**: [`database/schema_export.sql`](database/schema_export.sql)
+- **Automated Tests**:
+  ```bash
+  php artisan test
+  ```
+  Covers all TFA6 foundation tests (`PosFoundationsTest`) and TFA7 form, validation, `old()` retention, `256x256` Intervention Image resizing, `Storage::disk('public')` storage/cleanup, and placeholder fallback tests (`PosFormsAndUploadTest`).
 
 ---
 
 ## InfinityFree Deployment
 
-This project includes production packaging and automated deployment scripts:
-1. `build-infinityfree-zip.sh`: Packages application code, optimized production dependencies (`composer install --no-dev`), dual-mirrored CSS assets, and pre-seeded SQLite database into `it0049-pos-tfa6-infinityfree.zip`.
-2. `extract.php`: Self-extracting unpacking script that deploys the archive on InfinityFree shared hosting (`/htdocs`), provisions MySQL tables from `schema_export.sql`, sets storage permissions, and self-cleans.
-3. `deploy-infinityfree.sh` / `scripts/deploy_infinityfree.py`: Automated FTP deployment script communicating with `ftpupload.net`.
+1. Copy `env.production.example` to `.env.production` (gitignored) and set production environment/database values.
+2. Create gitignored `.deploy.env` with `FTP_USER`, `FTP_PASS`, and `APP_URL`.
+3. Package and upload:
+   ```bash
+   ./build-infinityfree-zip.sh
+   ./deploy-infinityfree.sh
+   ```
+4. Visit `http://it0049-tfa7.freehosting.dev/extract.php` once to unpack into `/htdocs`, configure storage/database (with automatic SQLite fallback if MySQL is unavailable), and remove `extract.php`.
 
-Live URL: **[http://it0049-tfa6.infinityfreeapp.com/](http://it0049-tfa6.infinityfreeapp.com/)**
+Live URL: **[http://it0049-tfa7.freehosting.dev](http://it0049-tfa7.freehosting.dev)**
 
 ---
 

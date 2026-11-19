@@ -1,109 +1,166 @@
 <?php
+
 /**
- * InfinityFree Deployment Extractor & Database Provisioner
- * Unpacks it0049-pos-tfa6-infinityfree.zip into /htdocs, sets permissions, boots MySQL schema, cleans up, and self-destructs.
+ * InfinityFree Deployment Extractor & Database Provisioner (TFA7)
+ * Unpacks it0049-pos-tfa7-infinityfree.zip into /htdocs, sets permissions,
+ * creates storage symlink when supported, boots MySQL or SQLite, and self-destructs.
  */
 header('Content-Type: text/plain; charset=utf-8');
 
-$zipFile = __DIR__ . '/it0049-pos-tfa6-infinityfree.zip';
+$zipFile = __DIR__.'/it0049-pos-tfa7-infinityfree.zip';
 
-if (!file_exists($zipFile)) {
+if (! file_exists($zipFile)) {
     http_response_code(404);
-    echo "ERROR: Deployment package not found at " . $zipFile . "\n";
+    echo 'ERROR: Deployment package not found at '.$zipFile."\n";
     exit(1);
 }
 
-if (!class_exists('ZipArchive')) {
+if (! class_exists('ZipArchive')) {
     http_response_code(500);
     echo "ERROR: ZipArchive extension is not enabled in this PHP environment.\n";
     exit(1);
 }
 
-$zip = new ZipArchive();
+/**
+ * Minimal .env reader for extracting MySQL credentials post-unpack.
+ *
+ * @return array<string, string>
+ */
+function loadEnvFile(string $path): array
+{
+    $vars = [];
+    if (! file_exists($path)) {
+        return $vars;
+    }
+
+    foreach (file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
+        $line = trim($line);
+        if ($line === '' || str_starts_with($line, '#') || ! str_contains($line, '=')) {
+            continue;
+        }
+        [$key, $value] = explode('=', $line, 2);
+        $vars[trim($key)] = trim($value, " \t\n\r\0\x0B\"'");
+    }
+
+    return $vars;
+}
+
+$zip = new ZipArchive;
 $res = $zip->open($zipFile);
 
-if ($res === TRUE) {
-    $extracted = $zip->extractTo(__DIR__);
-    $zip->close();
-
-    if ($extracted) {
-        @unlink($zipFile);
-        echo "SUCCESS: Extracted it0049-pos-tfa6-infinityfree.zip successfully!\n";
-        echo "All application files, production vendor dependencies, and assets are in place.\n";
-
-        // Remove default InfinityFree index2.html placeholder
-        if (file_exists(__DIR__ . '/index2.html')) {
-            @unlink(__DIR__ . '/index2.html');
-            echo "Removed default InfinityFree index2.html placeholder.\n";
-        }
-
-        // Ensure storage and cache directories exist and are writable
-        $storageDirs = [
-            __DIR__ . '/storage/app/public',
-            __DIR__ . '/storage/framework/cache/data',
-            __DIR__ . '/storage/framework/sessions',
-            __DIR__ . '/storage/framework/views',
-            __DIR__ . '/storage/logs',
-            __DIR__ . '/bootstrap/cache',
-        ];
-        foreach ($storageDirs as $sDir) {
-            if (!is_dir($sDir)) {
-                @mkdir($sDir, 0777, true);
-            }
-            @chmod($sDir, 0777);
-        }
-        echo "Verified storage and cache directories.\n";
-
-        // Automatically provision MySQL database schema from schema_export.sql
-        $sqlFile = __DIR__ . '/database/schema_export.sql';
-        $dbHost = 'sql203.infinityfree.com';
-        $dbName = 'if0_43262346_tfa6';
-        $dbUser = 'if0_43262346';
-        $dbPass = 'kgxr0KSILhJBnb';
-
-        $mysqlSuccess = false;
-        if (file_exists($sqlFile)) {
-            try {
-                $dsn = "mysql:host={$dbHost};dbname={$dbName};charset=utf8mb4";
-                $pdo = new PDO($dsn, $dbUser, $dbPass, [
-                    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-                    PDO::ATTR_TIMEOUT => 10,
-                ]);
-
-                $sqlContent = file_get_contents($sqlFile);
-                $statements = array_filter(array_map('trim', explode(';', $sqlContent)));
-
-                foreach ($statements as $stmt) {
-                    if (!empty($stmt) && !preg_match('/^(--|\/\*)/', $stmt)) {
-                        $pdo->exec($stmt);
-                    }
-                }
-                echo "SUCCESS: MySQL database schema and seed data imported into {$dbName} on {$dbHost}.\n";
-                $mysqlSuccess = true;
-            } catch (Exception $e) {
-                echo "NOTICE: MySQL automatic import encountered: " . $e->getMessage() . "\n";
-                echo "Switching .env to resilient pre-seeded SQLite connection for uninterrupted uptime.\n";
-            }
-        }
-
-        // If MySQL could not be initialized directly, configure SQLite fallback in .env
-        $envFile = __DIR__ . '/.env';
-        if (file_exists($envFile) && !$mysqlSuccess) {
-            $envContent = file_get_contents($envFile);
-            $envContent = preg_replace('/DB_CONNECTION=mysql/', 'DB_CONNECTION=sqlite', $envContent);
-            file_put_contents($envFile, $envContent);
-            echo "Configured resilient SQLite fallback in .env.\n";
-        }
-
-        // Self-destruct for security
-        @unlink(__FILE__);
-        echo "Removed extract.php for security.\n";
-        echo "Deployment complete! Visit http://it0049-tfa6.infinityfreeapp.com/ to verify.\n";
-    } else {
-        http_response_code(500);
-        echo "ERROR: Failed during extraction to " . __DIR__ . "\n";
-    }
-} else {
+if ($res !== true) {
     http_response_code(500);
-    echo "ERROR: Could not open zip file. Error code: " . $res . "\n";
+    echo 'ERROR: Could not open zip file. Error code: '.$res."\n";
+    exit(1);
 }
+
+$extracted = $zip->extractTo(__DIR__);
+$zip->close();
+
+if (! $extracted) {
+    http_response_code(500);
+    echo 'ERROR: Failed during extraction to '.__DIR__."\n";
+    exit(1);
+}
+
+@unlink($zipFile);
+echo "SUCCESS: Extracted it0049-pos-tfa7-infinityfree.zip successfully!\n";
+
+if (file_exists(__DIR__.'/index2.html')) {
+    @unlink(__DIR__.'/index2.html');
+    echo "Removed default InfinityFree index2.html placeholder.\n";
+}
+
+// Ensure writable storage & cache directories exist (including public/avatars for uploads)
+$storageDirs = [
+    __DIR__.'/storage/app/public/avatars',
+    __DIR__.'/storage/framework/cache/data',
+    __DIR__.'/storage/framework/sessions',
+    __DIR__.'/storage/framework/views',
+    __DIR__.'/storage/logs',
+    __DIR__.'/bootstrap/cache',
+];
+foreach ($storageDirs as $sDir) {
+    if (! is_dir($sDir)) {
+        @mkdir($sDir, 0775, true);
+    }
+    @chmod($sDir, 0775);
+}
+
+// Clear stale compiled views or config cache from any prior upload
+foreach (glob(__DIR__.'/storage/framework/views/*.php') ?: [] as $cachedView) {
+    @unlink($cachedView);
+}
+foreach (glob(__DIR__.'/bootstrap/cache/*.php') ?: [] as $cachedFile) {
+    @unlink($cachedFile);
+}
+
+// Create symlink when supported by host; Laravel /avatars/{filename} fallback serves files if blocked
+$linkTarget = __DIR__.'/storage/app/public';
+$linkPath = __DIR__.'/public/storage';
+if (! file_exists($linkPath) && function_exists('symlink')) {
+    @symlink($linkTarget, $linkPath);
+}
+
+$envFile = __DIR__.'/.env';
+$env = loadEnvFile($envFile);
+$sqlFile = __DIR__.'/database/schema_export.sql';
+
+$dbHost = $env['DB_HOST'] ?? '';
+$dbName = $env['DB_DATABASE'] ?? '';
+$dbUser = $env['DB_USERNAME'] ?? '';
+$dbPass = $env['DB_PASSWORD'] ?? '';
+$appUrl = $env['APP_URL'] ?? 'http://it0049-tfa7.freehosting.dev';
+
+$mysqlSuccess = false;
+if ($dbHost !== '' && $dbName !== '' && $dbUser !== '' && file_exists($sqlFile)) {
+    try {
+        $dsn = "mysql:host={$dbHost};dbname={$dbName};charset=utf8mb4";
+        $pdo = new PDO($dsn, $dbUser, $dbPass, [
+            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_TIMEOUT => 10,
+        ]);
+
+        $existingUsers = $pdo->query("SHOW TABLES LIKE 'users'")->fetchColumn();
+        if ($existingUsers === false) {
+            $sqlContent = file_get_contents($sqlFile);
+            $statements = array_filter(array_map('trim', explode(';', (string) $sqlContent)));
+            foreach ($statements as $stmt) {
+                if ($stmt !== '' && ! preg_match('/^(--|\/\*)/', $stmt)) {
+                    $pdo->exec($stmt);
+                }
+            }
+            echo "SUCCESS: Imported MySQL schema and initial seed data into {$dbName}.\n";
+        } else {
+            $avatarCol = $pdo->query("SHOW COLUMNS FROM `users` LIKE 'avatar'")->fetchColumn();
+            if ($avatarCol === false) {
+                $pdo->exec('ALTER TABLE `users` ADD COLUMN `avatar` varchar(255) DEFAULT NULL AFTER `role`');
+                echo "SUCCESS: Added avatar column to existing users table.\n";
+            } else {
+                echo "NOTICE: Existing MySQL tables and avatar column already present; preserved data.\n";
+            }
+        }
+        $mysqlSuccess = true;
+    } catch (Throwable $e) {
+        echo 'NOTICE: MySQL initialization failed ('.$e->getMessage()."). Falling back to SQLite.\n";
+    }
+}
+
+if (! $mysqlSuccess && file_exists($envFile)) {
+    $envContent = (string) file_get_contents($envFile);
+    $envContent = preg_replace('/^DB_CONNECTION=.*/m', 'DB_CONNECTION=sqlite', $envContent);
+    $envContent = preg_replace('/^DB_DATABASE=.*/m', '# DB_DATABASE=database/database.sqlite', $envContent);
+    file_put_contents($envFile, $envContent);
+
+    if (is_dir(__DIR__.'/database')) {
+        @chmod(__DIR__.'/database', 0775);
+    }
+    if (file_exists(__DIR__.'/database/database.sqlite')) {
+        @chmod(__DIR__.'/database/database.sqlite', 0664);
+    }
+    echo "Configured SQLite fallback in .env using database/database.sqlite.\n";
+}
+
+@unlink(__FILE__);
+echo "Removed extract.php for security.\n";
+echo "Deployment complete! Visit {$appUrl}/ to verify.\n";
