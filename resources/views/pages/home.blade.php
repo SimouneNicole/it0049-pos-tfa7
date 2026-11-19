@@ -5,6 +5,12 @@
     <div class="hero-copy">
         <h1 class="page-title">{{ $title }}</h1>
         <p class="lead-statement">Customer and staff records, kept in one clear place.</p>
+        <div class="hero-actions">
+            <a href="{{ route('customers.index') }}" class="glass-btn glass-btn-primary">Customers</a>
+            <a href="{{ route('customers.create') }}" class="glass-btn glass-btn-secondary">+ New Customer</a>
+            <a href="{{ route('users.index') }}" class="glass-btn glass-btn-primary">Users</a>
+            <a href="{{ route('users.create') }}" class="glass-btn glass-btn-secondary">+ New User</a>
+        </div>
     </div>
     <div class="hero-lens-stage" aria-hidden="true">
         <div class="glass-lens">

@@ -4,8 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ $title ?? 'Point of Sale' }} | POS</title>
-    <link rel="icon" type="image/x-icon" href="{{ asset('favicon.ico') }}">
-    <link rel="stylesheet" href="{{ asset('css/style.css') }}">
+    <link rel="icon" type="image/x-icon" href="{{ preg_replace('~^https?:~', '', asset('favicon.ico')) }}">
+    <link rel="stylesheet" href="{{ preg_replace('~^https?:~', '', asset('css/style.css')) }}">
+    <script src="{{ preg_replace('~^https?:~', '', asset('js/app.js')) }}" defer></script>
 </head>
 <body>
     <div class="site-canvas">
@@ -16,13 +17,14 @@
                 <div class="nav-links">
                     <a href="{{ route('home') }}" class="nav-item {{ request()->routeIs('home') ? 'is-active' : '' }}">Home</a>
                     <a href="{{ route('about') }}" class="nav-item {{ request()->routeIs('about') ? 'is-active' : '' }}">About</a>
-                    <a href="{{ route('customers.index') }}" class="nav-item {{ request()->routeIs('customers.index') ? 'is-active' : '' }}">Customers</a>
-                    <a href="{{ route('users.index') }}" class="nav-item {{ request()->routeIs('users.index') ? 'is-active' : '' }}">Users</a>
+                    <a href="{{ route('customers.index') }}" class="nav-item {{ request()->routeIs('customers.*') ? 'is-active' : '' }}">Customers</a>
+                    <a href="{{ route('users.index') }}" class="nav-item {{ request()->routeIs('users.*') ? 'is-active' : '' }}">Users</a>
                 </div>
             </nav>
         </header>
 
         <main class="content-stage">
+            @include('partials.flash')
             @yield('content')
         </main>
     </div>
