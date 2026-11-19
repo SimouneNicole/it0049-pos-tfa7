@@ -22,7 +22,9 @@ class AvatarService
     {
         $extension = $this->resolveSafeExtension($file);
 
-        $image = Image::decode($file)
+        // Read binary bytes instead of passing SplFileInfo so shared hosts with non-listable
+        // upload_tmp_dir (e.g. /home/uploads) do not fail Intervention's directory readability check.
+        $image = Image::decode($file->get())
             ->cover(self::AVATAR_DIMENSION, self::AVATAR_DIMENSION);
 
         $encoded = match ($extension) {
