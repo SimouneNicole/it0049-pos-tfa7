@@ -1,21 +1,17 @@
 -- ====================================================================
--- IT0049 (Web System Technologies) - Technical Formative Assessment 6
+-- IT0049 (Web System Technologies) - Technical Formative Assessment 7
 -- Student: Simoune Nicole
--- Project: Laravel POS Eloquent (Liquid Glass Architecture)
+-- Project: Laravel POS (Forms, Validation, and File Upload - Liquid Glass)
 -- File: schema_export.sql
 -- ====================================================================
 --
 -- SUBMISSION REQUIREMENT NOTE:
--- The laboratory instructions specify:
--- "A link to a GitHub repository containing your raw project files, including your database export or migration and seeder files."
+-- "A link to a GitHub repository containing your raw project files, including
+-- your database export or migration and seeder files."
 --
--- DESIGN & ARCHITECTURAL SCOPE:
--- For Technical Formative Assessment 6 (TFA6), the application transitions
--- from static in-memory arrays to Laravel Eloquent ORM.
---
--- Schema replicates TFA2:
--- 1. Table `customers` (id, full_name, email, phone, timestamps)
--- 2. Table `users` (id, username UNIQUE, full_name, role, timestamps)
+-- DESIGN & ARCHITECTURAL SCOPE (TFA7 extends TFA6):
+-- 1. Table `customers` (id, full_name, email UNIQUE, phone, timestamps)
+-- 2. Table `users` (id, username UNIQUE, full_name, role, avatar, timestamps)
 --
 -- Populated with Simoune's 6 canonical sample records per table.
 -- ====================================================================
@@ -57,6 +53,7 @@ CREATE TABLE `users` (
   `username` varchar(50) NOT NULL,
   `full_name` varchar(100) NOT NULL,
   `role` varchar(50) NOT NULL DEFAULT 'Staff Member',
+  `avatar` varchar(255) DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`id`),
@@ -67,11 +64,11 @@ CREATE TABLE `users` (
 -- Dumping data for table `users`
 -- --------------------------------------------------------------------
 LOCK TABLES `users` WRITE;
-INSERT INTO `users` (`id`, `username`, `full_name`, `role`, `created_at`, `updated_at`) VALUES
-(1, 'clara.delgado', 'Clara Delgado', 'System Administrator', NOW(), NOW()),
-(2, 'marcus.thorne', 'Marcus Thorne', 'Store Manager', NOW(), NOW()),
-(3, 'eleanor.vance', 'Eleanor Vance', 'Head Cashier', NOW(), NOW()),
-(4, 'lucas.gallagher', 'Lucas Gallagher', 'Cashier', NOW(), NOW()),
-(5, 'sophia.sterling', 'Sophia Sterling', 'Inventory Specialist', NOW(), NOW()),
-(6, 'julian.hayes', 'Julian Hayes', 'Cashier', NOW(), NOW());
+INSERT INTO `users` (`id`, `username`, `full_name`, `role`, `avatar`, `created_at`, `updated_at`) VALUES
+(1, 'clara.delgado', 'Clara Delgado', 'System Administrator', NULL, NOW(), NOW()),
+(2, 'marcus.thorne', 'Marcus Thorne', 'Store Manager', NULL, NOW(), NOW()),
+(3, 'eleanor.vance', 'Eleanor Vance', 'Head Cashier', NULL, NOW(), NOW()),
+(4, 'lucas.gallagher', 'Lucas Gallagher', 'Cashier', NULL, NOW(), NOW()),
+(5, 'sophia.sterling', 'Sophia Sterling', 'Inventory Specialist', NULL, NOW(), NOW()),
+(6, 'julian.hayes', 'Julian Hayes', 'Cashier', NULL, NOW(), NOW());
 UNLOCK TABLES;

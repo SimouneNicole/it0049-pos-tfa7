@@ -1,8 +1,8 @@
 {
     "$schema": "https://getcomposer.org/schema.json",
-    "name": "simoune/it0049-pos-tfa6",
+    "name": "simoune/it0049-pos-tfa7",
     "type": "project",
-    "description": "IT0049 Point of Sale System - Technical Formative Assessment 6 (Laravel Eloquent)",
+    "description": "IT0049 Point of Sale System - Technical Formative Assessment 7 (Forms, Validation & File Upload)",
     "keywords": [
         "laravel",
         "framework"
@@ -10,6 +10,7 @@
     "license": "MIT",
     "require": {
         "php": "^8.3",
+        "intervention/image-laravel": "^4.1",
         "laravel/framework": "^13.17",
         "laravel/tinker": "^3.0"
     },
